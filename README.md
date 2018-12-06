@@ -31,3 +31,6 @@ Read the data converted to voltage from a single ADC channel.
 
 ### write_volts
 Set the voltage value to a single DAC channel.
+
+## Credits
+To [github.com/jaxbulsara/pyadda](https://github.com/jaxbulsara/pyadda)
