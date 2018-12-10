@@ -14,22 +14,22 @@ sudo python3 example.py
 ```
 
 ## Functions
-### start_adda
+### start_adda(int gain, int sampling_rate, int scan_mode)
 Start interface and set gain, sampling rate, and scan mode.
 
-### stop_adda
+### stop_adda()
 End interface.
 
-### read_adc
+### read_adc()
 Command the chip to collect data.
 
-### get_channel_raw
-Read the raw data from a single ADC channel
+### get_channel_raw(int channel_id)
+Returns the raw data from a single ADC channel
 
-### get_channel_volts
-Read the data converted to voltage from a single ADC channel.
+### get_channel_volts(int channel_id)
+Returns the data converted to voltage from a single ADC channel.
 
-### write_volts
+### write_volts(int channel_id, float voltage, float ref_voltage)
 Set the voltage value to a single DAC channel.
 
 ## Credits
