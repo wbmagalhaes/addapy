@@ -42,10 +42,10 @@ RPI_V2_GPIO_P1_13->RPI_GPIO_P1_13
 //DRDY	-----   ctl_IO     data  starting
 //RST	-----   ctl_IO     reset
 
-#define DRDY RPI_GPIO_P1_11   //P0
-#define RST RPI_GPIO_P1_12	//P1
-#define SPICS RPI_GPIO_P1_15  //P3   ADS1256 CS
-#define SPICS1 RPI_GPIO_P1_16 //P4   DAC8532 CS
+#define DRDY RPI_GPIO_P1_11		//P0
+#define RST RPI_GPIO_P1_12		//P1
+#define SPICS RPI_GPIO_P1_15	//P3   ADS1256 CS
+#define SPICS1 RPI_GPIO_P1_16	//P4   DAC8532 CS
 
 #define CS_1() bcm2835_gpio_write(SPICS, HIGH)
 #define CS_0() bcm2835_gpio_write(SPICS, LOW)
@@ -222,6 +222,9 @@ void ReadADC(void);
 long int GetChannelRaw(int ch_id);
 double GetChannelVolts(int ch_id);
 void WriteVolts(int ch_id, float volts, float vRef);
+
+void GetAllChannelsRaw(long int * adc);
+void GetAllChannelsVolts(double * volts);
 /***************************************************/
 
 void bsp_DelayUS(uint64_t micros)
@@ -753,6 +756,7 @@ uint8_t ADS1256_Scan(void)
 
 	return 0;
 }
+
 /*
 *********************************************************************************************************
 *	name: Write_DAC8532
@@ -771,6 +775,7 @@ void Write_DAC8532(uint8_t channel, uint16_t data)
 	bcm2835_spi_transfer((data & 0xff));
 	CS1_1();
 }
+
 /*
 *********************************************************************************************************
 *	name: Voltage_Convert
@@ -782,7 +787,9 @@ void Write_DAC8532(uint8_t channel, uint16_t data)
 */
 uint16_t Voltage_Convert(float Vref, float voltage)
 {
-	return (uint16_t)(65536 * voltage / Vref);
+	uint16_t _V_;
+	_V_ = (uint16_t)(65536 * voltage / Vref);
+	return _V_;
 }
 
 /*
@@ -800,21 +807,16 @@ void StartADDA(int gain, int rate, int mode)
 	// check if bcm2835 library initializes properly
 	// also serves to run bcm2835_init()
 	if (!bcm2835_init())
-	{
 		// if library does not initialize, end program
 		return;
-	}
 
 	bcm2835_spi_begin();
 	bcm2835_spi_setBitOrder(BCM2835_SPI_BIT_ORDER_MSBFIRST);	//default
 	bcm2835_spi_setDataMode(BCM2835_SPI_MODE1);					//default
 	bcm2835_spi_setClockDivider(BCM2835_SPI_CLOCK_DIVIDER_256); //default
 
-	bcm2835_gpio_fsel(SPICS, BCM2835_GPIO_FSEL_OUTP);
-	bcm2835_gpio_write(SPICS, HIGH);
-
-	bcm2835_gpio_fsel(DRDY, BCM2835_GPIO_FSEL_INPT);
-	bcm2835_gpio_set_pud(DRDY, BCM2835_GPIO_PUD_UP);
+	bcm2835_gpio_fsel(SPICS1, BCM2835_GPIO_FSEL_OUTP);
+	bcm2835_gpio_write(SPICS1, HIGH);
 
 	// get chip id
 	uint8_t id = ADS1256_ReadChipID();
@@ -823,17 +825,17 @@ void StartADDA(int gain, int rate, int mode)
 	printf("\r\n");
 	printf("ID=\r\n");
 	if (id != 3)
-	{
 		printf("Error, ASD1256 Chip ID = 0x%d\r\n", (int)id);
-	}
 	else
-	{
 		printf("Ok, ASD1256 Chip ID = 0x%d\r\n", (int)id);
-	}
 
 	// setup ADC gain and sampling rate
 	ADS1256_CfgADC(gain, rate);
 	ADS1256_StartScan(mode);
+
+	ReadADC();
+	WriteVolts(0, 0, 5);
+	WriteVolts(1, 0, 5);
 }
 
 /*
@@ -852,9 +854,11 @@ void StopADDA(void)
 
 void ReadADC(void)
 {
+	while (!DRDY_IS_LOW())
+		;
+
 	ADS1256_ISR();
 }
-
 /*
 *********************************************************************************************************
 *	name: GetChannelRaw
@@ -881,6 +885,30 @@ double GetChannelVolts(int ch_id)
 	return (double)ADS1256_GetAdc(ch_id) * 5.0 / 8388608.0;
 }
 
+void GetAllChannelsRaw(long int * adc)
+{
+	int array_len = 0;
+	if (g_tADS1256.ScanMode == 0) /* 0 = Single-ended input 8 channel */
+		array_len = 8;
+	else if (g_tADS1256.ScanMode == 1) /* 1 = Differential input 4 channel */
+		array_len = 4;
+
+	for (int i = 0; i < array_len; i++)
+		adc[i] = (double)ADS1256_GetAdc(i);
+}
+
+void GetAllChannelsVolts(double * volts)
+{
+	int array_len = 0;
+	if (g_tADS1256.ScanMode == 0) /* 0 = Single-ended input 8 channel */
+		array_len = 8;
+	else if (g_tADS1256.ScanMode == 1) /* 1 = Differential input 4 channel */
+		array_len = 4;
+
+	for (int i = 0; i < array_len; i++)
+		volts[i] = (double)ADS1256_GetAdc(i) * 5 / 8388608;
+}
+
 /*
 *********************************************************************************************************
 *	name: WriteVolts
@@ -893,7 +921,8 @@ double GetChannelVolts(int ch_id)
 */
 void WriteVolts(int ch_id, float volts, float vRef)
 {
-	uint16_t v = Voltage_Convert(vRef, volts);
+	uint16_t v;
+	v = Voltage_Convert(vRef, volts);
 
 	if (ch_id == 0)
 		Write_DAC8532(channel_A, v);
