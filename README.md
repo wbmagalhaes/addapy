@@ -29,8 +29,15 @@ Returns the raw data from a single ADC channel
 ### get_channel_volts(int channel_id)
 Returns the data converted to voltage from a single ADC channel.
 
+### get_all_channels_raw()
+Returns the data from all ADC channels.
+
+### get_all_channels_volts()
+Returns the data converted to voltage from all ADC channels.
+
 ### write_volts(int channel_id, float voltage, float ref_voltage)
 Set the voltage value to a single DAC channel.
+
 
 ## Credits
 To [github.com/jaxbulsara/pyadda](https://github.com/jaxbulsara/pyadda)
